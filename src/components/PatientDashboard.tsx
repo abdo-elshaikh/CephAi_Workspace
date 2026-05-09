@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
@@ -17,6 +18,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { addDoc, serverTimestamp } from "firebase/firestore";
 
 interface Patient {
   id: string;
@@ -38,6 +52,42 @@ export const PatientDashboard = ({ onNewAnalysis, onSelectAnalysis }: { onNewAna
   const [patients, setPatients] = useState<Patient[]>([]);
   const [recentAnalyses, setRecentAnalyses] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPatientDialogOpen, setIsPatientDialogOpen] = useState(false);
+  const [newPatientData, setNewPatientData] = useState({ firstName: '', lastName: '' });
+
+  const handleCreatePatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!newPatientData.firstName || !newPatientData.lastName) {
+      toast.error('First and Last names are required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const docRef = await addDoc(collection(db, 'patients'), {
+        ownerId: user.uid,
+        firstName: newPatientData.firstName,
+        lastName: newPatientData.lastName,
+        createdAt: serverTimestamp(),
+      });
+      
+      setPatients([{
+        id: docRef.id,
+        firstName: newPatientData.firstName,
+        lastName: newPatientData.lastName,
+        createdAt: Timestamp.now(),
+      }, ...patients]);
+      
+      setIsPatientDialogOpen(false);
+      setNewPatientData({ firstName: '', lastName: '' });
+      toast.success('Patient created successfully');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'patients');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -184,10 +234,63 @@ export const PatientDashboard = ({ onNewAnalysis, onSelectAnalysis }: { onNewAna
 
           {/* Right: Patient Directory */}
           <aside className="space-y-6">
-            <h2 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-400" />
-              Patient Directory
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" />
+                Patient Directory
+              </h2>
+              <Dialog open={isPatientDialogOpen} onOpenChange={setIsPatientDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] uppercase tracking-wider text-indigo-400 hover:text-indigo-300 hover:bg-slate-800">
+                    <Plus className="w-3 h-3 mr-1" /> Add Patient
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-700 text-slate-200">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-bold font-mono text-indigo-400">Add New Patient</DialogTitle>
+                    <DialogDescription className="text-slate-400">
+                      Create a new patient record in the registry.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreatePatient}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="firstName" className="text-right text-slate-300 text-xs font-bold uppercase">
+                          First Name
+                        </Label>
+                        <Input
+                          id="firstName"
+                          value={newPatientData.firstName}
+                          onChange={(e) => setNewPatientData({ ...newPatientData, firstName: e.target.value })}
+                          className="col-span-3 bg-slate-950 border-slate-700 text-slate-200 focus-visible:ring-indigo-500"
+                          placeholder="Jane"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="lastName" className="text-right text-slate-300 text-xs font-bold uppercase">
+                          Last Name
+                        </Label>
+                        <Input
+                          id="lastName"
+                          value={newPatientData.lastName}
+                          onChange={(e) => setNewPatientData({ ...newPatientData, lastName: e.target.value })}
+                          className="col-span-3 bg-slate-950 border-slate-700 text-slate-200 focus-visible:ring-indigo-500"
+                          placeholder="Doe"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="ghost" onClick={() => setIsPatientDialogOpen(false)} className="text-slate-400 hover:text-white">
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold">
+                        {loading ? 'Creating...' : 'Create Patient'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
             
             <Card className="bg-[#111827] border-slate-800 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/5">
               <ScrollArea className="h-[600px]">

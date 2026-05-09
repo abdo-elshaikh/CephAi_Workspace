@@ -335,10 +335,11 @@ export const RadiographViewer = ({
                   className="pointer-events-auto cursor-pointer group"
                   onMouseDown={(e) => {
                     e.stopPropagation();
-                    setDraggingLandmarkId(lm.id);
-                    // Also make it the active landmark for any related sidebar views
                     if (setActiveLandmarkId) {
                       setActiveLandmarkId(lm.id);
+                    }
+                    if (mode === 'view') {
+                      setDraggingLandmarkId(lm.id);
                     }
                   }}
                 >
@@ -423,7 +424,8 @@ export const RadiographViewer = ({
               )}
 
               {measurements.map((m) => (
-                <g key={m.id}>
+                <g key={m.id} className="pointer-events-auto cursor-pointer group">
+                  <title>{`${m.value.toFixed(1)} ${m.unit}`}</title>
                   {m.type === 'distance' && m.points.length === 2 && (
                     <>
                       <line
@@ -432,7 +434,17 @@ export const RadiographViewer = ({
                         x2={m.points[1].x}
                         y2={m.points[1].y}
                         stroke="#818cf8"
+                        strokeWidth="5"
+                        strokeOpacity="0.01"
+                      />
+                      <line
+                        x1={m.points[0].x}
+                        y1={m.points[0].y}
+                        x2={m.points[1].x}
+                        y2={m.points[1].y}
+                        stroke="#818cf8"
                         strokeWidth="1.5"
+                        className="group-hover:stroke-[3px] transition-all"
                       />
                       <text
                         x={(m.points[0].x + m.points[1].x) / 2}
@@ -441,16 +453,18 @@ export const RadiographViewer = ({
                         fontSize="9"
                         fontWeight="bold"
                         textAnchor="middle"
-                        className="drop-shadow-md"
+                        className="drop-shadow-md group-hover:fill-white transition-colors"
                       >
-                        {m.value.toFixed(1)}px
+                        {m.value.toFixed(1)}{m.unit}
                       </text>
                     </>
                   )}
                   {m.type === 'angle' && m.points.length === 3 && (
                     <>
-                      <line x1={m.points[0].x} y1={m.points[0].y} x2={m.points[1].x} y2={m.points[1].y} stroke="#f472b6" strokeWidth="1.5" />
-                      <line x1={m.points[1].x} y1={m.points[1].y} x2={m.points[2].x} y2={m.points[2].y} stroke="#f472b6" strokeWidth="1.5" />
+                      <line x1={m.points[0].x} y1={m.points[0].y} x2={m.points[1].x} y2={m.points[1].y} stroke="#f472b6" strokeWidth="5" strokeOpacity="0.01" />
+                      <line x1={m.points[1].x} y1={m.points[1].y} x2={m.points[2].x} y2={m.points[2].y} stroke="#f472b6" strokeWidth="5" strokeOpacity="0.01" />
+                      <line x1={m.points[0].x} y1={m.points[0].y} x2={m.points[1].x} y2={m.points[1].y} stroke="#f472b6" strokeWidth="1.5" className="group-hover:stroke-[3px] transition-all" />
+                      <line x1={m.points[1].x} y1={m.points[1].y} x2={m.points[2].x} y2={m.points[2].y} stroke="#f472b6" strokeWidth="1.5" className="group-hover:stroke-[3px] transition-all" />
                       <circle cx={m.points[1].x} cy={m.points[1].y} r="3" fill="#f472b6" />
                       <text
                         x={m.points[1].x + 10}
@@ -458,9 +472,9 @@ export const RadiographViewer = ({
                         fill="#f472b6"
                         fontSize="11"
                         fontWeight="bold"
-                        className="drop-shadow-md uppercase tracking-wide"
+                        className="drop-shadow-md uppercase tracking-wide group-hover:fill-white transition-colors"
                       >
-                        {m.value.toFixed(1)}°
+                        {m.value.toFixed(1)}{m.unit}
                       </text>
                     </>
                   )}

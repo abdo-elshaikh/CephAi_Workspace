@@ -1,4 +1,5 @@
 
+import * as React from 'react';
 import { Button } from "@/components/ui/button";
 import { 
   Upload, 
@@ -10,12 +11,18 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ImageSettings } from '../types';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface ToolbarProps {
   onUpload: () => void;
+  onUrlUpload: (url: string) => Promise<void>;
   onReset: () => void;
   onAutoDetect: () => void;
   isDetecting: boolean;
@@ -27,6 +34,7 @@ interface ToolbarProps {
 
 export const Toolbar = ({ 
   onUpload, 
+  onUrlUpload,
   onReset, 
   onAutoDetect, 
   isDetecting,
@@ -35,6 +43,25 @@ export const Toolbar = ({
   aiModel,
   setAiModel
 }: ToolbarProps) => {
+  const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [isUploadingUrl, setIsUploadingUrl] = useState(false);
+
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageUrl) return;
+    setIsUploadingUrl(true);
+    try {
+      await onUrlUpload(imageUrl);
+      setIsUrlDialogOpen(false);
+      setImageUrl("");
+    } catch (e) {
+      toast.error("Failed to load image from URL. It may be invalid or blocked by CORS.");
+    } finally {
+      setIsUploadingUrl(false);
+    }
+  };
+
   return (
     <header className="flex items-center justify-between px-4 h-12 bg-[#1e293b] border-b border-slate-700 shadow-lg z-50">
       <div className="flex items-center gap-4">
@@ -95,15 +122,61 @@ export const Toolbar = ({
             </Dialog>
           )}
           
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onUpload}
-            className="h-8 text-slate-400 hover:text-white hover:bg-slate-700/50 text-[10px] uppercase font-bold px-2 gap-2"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-slate-400 hover:text-white hover:bg-slate-700/50 text-[10px] uppercase font-bold px-2 gap-2"
+              />
+            }>
+              <Upload className="w-3.5 h-3.5" />
+              Import
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-slate-800 border-slate-700 text-slate-300 min-w-[150px]">
+              <DropdownMenuItem onClick={onUpload} className="text-xs uppercase font-bold focus:bg-slate-700 focus:text-white cursor-pointer">
+                Local File
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsUrlDialogOpen(true)} className="text-xs uppercase font-bold focus:bg-slate-700 focus:text-white cursor-pointer">
+                From URL
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
+            <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-700 text-slate-200">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold font-mono text-cyan-400">Import from URL</DialogTitle>
+                <DialogDescription className="text-slate-400">
+                  Enter the URL of a radiograph image to analyze.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleUrlSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="imageUrl" className="text-right text-slate-300 text-xs font-bold uppercase">
+                      Image URL
+                    </Label>
+                    <Input
+                      id="imageUrl"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="col-span-3 bg-slate-950 border-slate-700 text-slate-200 focus-visible:ring-cyan-500"
+                      placeholder="https://example.com/xray.jpg"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="ghost" onClick={() => setIsUrlDialogOpen(false)} className="text-slate-400 hover:text-white">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isUploadingUrl || !imageUrl} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold">
+                    {isUploadingUrl ? 'Importing...' : 'Import'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
           
           <Button 
             variant="ghost" 

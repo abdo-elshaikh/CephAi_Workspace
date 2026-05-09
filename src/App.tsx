@@ -40,6 +40,7 @@ function EditorView() {
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [activeLandmarkId, setActiveLandmarkId] = useState<string | null>(LANDMARK_DEFINITIONS[0].id);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [isDetecting, setIsDetecting] = useState(false);
   const [calibration, setCalibration] = useState<Calibration>({
     p1: null,
@@ -107,12 +108,15 @@ function EditorView() {
   // Keep all the handler functions here
   const handleSaveAnalysis = async () => {
     if (!user || !image) return;
+    if (!selectedPatientId) {
+      toast.error("Please assign this analysis to a patient before saving.");
+      return;
+    }
     try {
       await addDoc(collection(db, 'analyses'), {
         ownerId: user.uid,
-        patientId: 'demo-patient', 
+        patientId: selectedPatientId, 
         landmarks,
-        // Don't save results directly since they are computed, but we can store them to make life easier
         results: analysisResults,
         calibration,
         createdAt: serverTimestamp()
@@ -137,6 +141,24 @@ function EditorView() {
       }
     };
     input.click();
+  };
+
+  const handleUrlUpload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('URL does not point to a valid image');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImage(e.target?.result as string);
+        toast.success("Radiograph imported successfully from URL.");
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error(error);
+      throw error; // Let the UI handle the error
+    }
   };
 
   const handlePlacePoint = (point: Point) => {
@@ -265,6 +287,7 @@ function EditorView() {
     <div className="flex flex-col h-screen w-screen bg-[#0f172a] text-slate-200 font-sans overflow-hidden">
       <Toolbar 
         onUpload={handleUpload}
+        onUrlUpload={handleUrlUpload}
         onReset={() => setSettings({ brightness: 100, contrast: 100, zoom: 0.8, pan: { x: 50, y: 50 } })}
         onAutoDetect={handleAutoDetect}
         isDetecting={isDetecting}
@@ -330,10 +353,13 @@ function EditorView() {
           </div>
         </main>
         <RightSidebar 
+          landmarks={landmarks}
           analysisResults={analysisResults} 
           measurements={measurements} 
           analysisType={analysisType}
           setAnalysisType={setAnalysisType}
+          selectedPatientId={selectedPatientId}
+          setSelectedPatientId={setSelectedPatientId}
         />
       </div>
       

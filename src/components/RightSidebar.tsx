@@ -1,31 +1,73 @@
-import { AnalysisResult, Measurement } from '../types';
+import { AnalysisResult, Measurement, Landmark } from '../types';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calculator } from 'lucide-react';
+import { Calculator, Download, Users } from 'lucide-react';
 import { generateRadiologyReport } from '../lib/pdfGenerator';
 import { toast } from 'sonner';
 import { ANALYSIS_TYPES } from '../constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+
+interface Patient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  createdAt: Timestamp;
+}
 
 interface RightSidebarProps {
+  landmarks: Landmark[];
   analysisResults: AnalysisResult[];
   measurements: Measurement[];
   analysisType: string;
   setAnalysisType: (type: string) => void;
+  selectedPatientId: string;
+  setSelectedPatientId: (id: string) => void;
 }
 
 export const RightSidebar = ({ 
+  landmarks,
   analysisResults,
   measurements,
   analysisType,
-  setAnalysisType
+  setAnalysisType,
+  selectedPatientId,
+  setSelectedPatientId
 }: RightSidebarProps) => {
+
+  const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchPatients = async () => {
+      try {
+        const patientsQuery = query(
+          collection(db, 'patients'),
+          where('ownerId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+        const pSnap = await getDocs(patientsQuery);
+        setPatients(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Patient)));
+      } catch (error) {
+        // silent error for patients fetch in sidebar
+        console.error(error);
+      }
+    };
+    fetchPatients();
+  }, [user]);
 
   const handlePrintReport = () => {
     try {
+      const patient = patients.find(p => p.id === selectedPatientId);
+      
       generateRadiologyReport(
         {
-          id: 'PAT-48291',
-          name: 'Jane Doe',
+          id: patient ? patient.id : 'PAT-UNKNOWN',
+          name: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient',
           date: new Date()
         },
         analysisResults,
@@ -35,6 +77,30 @@ export const RightSidebar = ({
     } catch (error) {
       console.error(error);
       toast.error('Failed to generate report.');
+    }
+  };
+
+  const handleExportJson = () => {
+    try {
+      const data = {
+        landmarks,
+        measurements,
+        analysisResults,
+        exportedAt: new Date().toISOString(),
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ceph_analysis_${new Date().getTime()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Analysis exported to JSON');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export JSON');
     }
   };
 
@@ -48,18 +114,37 @@ export const RightSidebar = ({
           </h3>
         </div>
         
-        <Select value={analysisType} onValueChange={setAnalysisType}>
-          <SelectTrigger className="w-full h-8 text-[11px] font-bold bg-slate-900 border-slate-700 text-slate-200">
-            <SelectValue placeholder="Select Analysis" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
-            {ANALYSIS_TYPES.map(type => (
-              <SelectItem key={type.id} value={type.id} className="text-[11px]">
-                {type.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2">
+          <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+            <SelectTrigger className="w-full h-8 text-[11px] font-bold bg-slate-900 border-slate-700 text-indigo-400">
+              <SelectValue placeholder="Assign to Patient" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+              {patients.length === 0 ? (
+                <SelectItem value="empty" disabled className="text-[11px] italic">No patients found</SelectItem>
+              ) : (
+                patients.map(p => (
+                  <SelectItem key={p.id} value={p.id} className="text-[11px]">
+                    {p.lastName}, {p.firstName}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+
+          <Select value={analysisType} onValueChange={setAnalysisType}>
+            <SelectTrigger className="w-full h-8 text-[11px] font-bold bg-slate-900 border-slate-700 text-slate-200">
+              <SelectValue placeholder="Select Analysis" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+              {ANALYSIS_TYPES.map(type => (
+                <SelectItem key={type.id} value={type.id} className="text-[11px]">
+                  {type.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
@@ -115,12 +200,21 @@ export const RightSidebar = ({
             <span className="text-slate-600 italic">No diagnostic data available. Please complete landmarking.</span>
           )}
         </div>
-        <button 
-          onClick={handlePrintReport}
-          className="w-full mt-4 bg-slate-700 hover:bg-slate-600 py-2 rounded text-[10px] font-bold uppercase transition-all tracking-widest border border-slate-600 text-slate-100"
-        >
-          Print Full Radiology Report
-        </button>
+        <div className="flex gap-2 w-full mt-4">
+          <button 
+            onClick={handlePrintReport}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded text-[10px] font-bold uppercase transition-all tracking-widest border border-slate-600 text-slate-100"
+          >
+            Print
+          </button>
+          <button 
+            onClick={handleExportJson}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 flex items-center justify-center gap-2 rounded text-[10px] font-bold uppercase transition-all tracking-widest border border-slate-600 text-slate-100"
+          >
+            <Download className="w-3.5 h-3.5" />
+            JSON
+          </button>
+        </div>
       </div>
     </aside>
   );

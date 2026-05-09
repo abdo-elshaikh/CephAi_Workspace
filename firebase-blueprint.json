@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Patient": {
+      "title": "Patient Record",
+      "description": "Patient demographic and clinical data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "birthDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "firstName", "lastName"]
+    },
+    "Analysis": {
+      "title": "Cephalometric Analysis",
+      "description": "Detailed analysis results for a specific radiograph.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "landmarks": { "type": "array" },
+        "results": { "type": "array" },
+        "calibration": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "patientId", "landmarks", "results"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profile and personalization data."
+    },
+    "patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Directory of patients managed by the clinician."
+    },
+    "analyses/{analysisId}": {
+      "schema": "Analysis",
+      "description": "Storage for specific ceph analyses and trace data."
+    }
+  }
+}

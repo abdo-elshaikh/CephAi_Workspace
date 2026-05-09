@@ -1,0 +1,6 @@
+{
+  "name": "CephAI: Advanced Cephalometric Analysis",
+  "description": "A professional AI-driven cephalometric analysis tool with automated landmarking, precise calibration, and comprehensive diagnostic measurements inspired by Dolphin Imaging and WebCeph.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
